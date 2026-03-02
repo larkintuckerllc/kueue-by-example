@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: sample-job-
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: default-local-queue
+spec:
+  parallelism: 3
+  completions: 3
+  suspend: true # Kueue will manage this field
+  template:
+    spec:
+      containers:
+      - name: sample-worker
+        image: alpine
+        command: ["/bin/sh", "-c", "sleep 10"]
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+      restartPolicy: Never

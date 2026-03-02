@@ -1,0 +1,15 @@
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: default-cluster-queue
+spec:
+  namespaceSelector: {} # Allow all namespaces to use this queue
+  resourceGroups:
+  - coveredResources: ["cpu", "memory"]
+    flavors:
+    - name: default-flavor
+      resources:
+      - name: "cpu"
+        nominalQuota: 1
+      - name: "memory"
+        nominalQuota: 1Gi
