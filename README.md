@@ -12,10 +12,21 @@ The environment is built on macOS (Darwin) using the following toolchain:
 - **Kubernetes**: v1.31.0 (via Kind)
 
 ### Cluster Setup
-The cluster was provisioned using `kindest/node:v1.31.0` to ensure stability for modern batch features like Pod Scheduling Readiness (Pod Gates) and advanced Job policies.
+The cluster is provisioned using a multi-node configuration to support specialized resource pools (Spot/On-Demand).
+
+**kind-config.yaml:**
+```yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker # Node 1: Generic
+- role: worker # Node 2: Spot
+- role: worker # Node 3: On-Demand
+```
 
 ```bash
-kind create cluster --image kindest/node:v1.31.0 --name kueue-lab
+kind create cluster --name kueue-lab --config kind-config.yaml --image kindest/node:v1.31.0
 ```
 
 ## 🚀 Kueue Installation
@@ -42,6 +53,11 @@ helm install kueue oci://registry.k8s.io/kueue/charts/kueue
   - `cluster-queue.yaml`: The cluster-wide resource pool (1 CPU quota).
   - `local-queue.yaml`: The namespace-specific entry point.
   - `sample-job.yaml`: A basic Job with 3 pods (100m CPU each).
+- **`part-2/`**: "Smart Selection" - Multi-flavor fallback and automatic injection.
+  - `resource-flavors.yaml`: Defines `spot` and `on-demand` flavors with taints/tolerations.
+  - `cluster-queue.yaml`: A prioritized queue that falls back to On-Demand if Spot is full.
+  - `local-queue.yaml`: Connects to the smart queue.
+  - `sample-job.yaml`: A job template for testing the fallback logic.
 
 ## 🧠 Core Concepts (Part 1)
 
@@ -55,6 +71,22 @@ The Part 1 example illustrates the fundamental **Admission Control** workflow:
   2. Kueue intercepts the Job based on the `kueue.x-k8s.io/queue-name` label.
   3. Kueue verifies available quota in the `ClusterQueue`.
   4. Once admitted, Kueue flips `suspend: false`, and the standard K8s scheduler starts the pods.
+
+## 🚀 Advanced Concepts (Part 2)
+
+Part 2 explores **Smart Resource Selection** using multiple flavors and taints:
+
+- **Flavor Prioritization**: By listing `spot` before `on-demand` in the `ClusterQueue`, Kueue always attempts to fit jobs into the "cheaper" pool first.
+- **Automatic Injection**: Kueue automatically adds `nodeSelector` and `tolerations` to the Job based on the selected flavor. This means users don't need to know about the underlying infrastructure details.
+- **Tainted Node Protection**: Using `NoSchedule` taints on Spot/On-Demand nodes ensures that ONLY Kueue-managed jobs (which get the injected tolerations) can land on these specialized resources.
+
+### Execution Plan
+1. **Multi-Node Cluster**: A Kind cluster with 3 worker nodes (Generic, Spot, On-Demand).
+2. **Specialized Taints**: One node is tainted as `spot`, another as `on-demand`.
+3. **Infrastructure**: Apply ResourceFlavors that match these taints.
+4. **Fallback Test**:
+   - Create **Job 1**: Fits in the 500m Spot quota. Kueue injects `spot` tolerations.
+   - Create **Job 2**: Spot quota is now exhausted (only 100m left). Kueue automatically selects the `on-demand` flavor and injects the corresponding tolerations.
 
 ## 🧪 Verification Commands
 

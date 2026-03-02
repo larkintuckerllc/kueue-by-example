@@ -1,0 +1,21 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: part-2-job-
+  labels:
+    kueue.x-k8s.io/queue-name: smart-local-queue
+spec:
+  parallelism: 2
+  completions: 2
+  suspend: true
+  template:
+    spec:
+      containers:
+      - name: batch-job
+        image: gcr.io/k8s-staging-perf-tests/sleep:v0.1.0
+        args: ["30s"]
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "100Mi"
+      restartPolicy: Never

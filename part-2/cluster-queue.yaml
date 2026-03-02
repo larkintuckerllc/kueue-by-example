@@ -1,0 +1,21 @@
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: smart-cluster-queue
+spec:
+  namespaceSelector: {} # Match all namespaces
+  resourceGroups:
+  - coveredResources: ["cpu", "memory"]
+    flavors:
+    - name: spot
+      resources:
+      - name: cpu
+        nominalQuota: 500m
+      - name: memory
+        nominalQuota: 512Mi
+    - name: on-demand
+      resources:
+      - name: cpu
+        nominalQuota: 1500m
+      - name: memory
+        nominalQuota: 1.5Gi

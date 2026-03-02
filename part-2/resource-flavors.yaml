@@ -1,0 +1,25 @@
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: spot
+spec:
+  nodeLabels:
+    provisioning: spot
+  tolerations:
+  - key: "provisioning"
+    operator: "Equal"
+    value: "spot"
+    effect: "NoSchedule"
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: on-demand
+spec:
+  nodeLabels:
+    provisioning: on-demand
+  tolerations:
+  - key: "provisioning"
+    operator: "Equal"
+    value: "on-demand"
+    effect: "NoSchedule"
