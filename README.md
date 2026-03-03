@@ -46,6 +46,19 @@ helm install kueue oci://registry.k8s.io/kueue/charts/kueue
   --wait
 ```
 
+## 🧪 Verification Commands
+
+To verify the installation and API versions:
+
+```bash
+# Check Kueue pods
+kubectl get pods -n kueue-system
+
+# Verify CRD Storage Version (should be v1beta2)
+kubectl get crd clusterqueues.kueue.x-k8s.io -o jsonpath='{range .spec.versions[*]}{.name}{" (Storage: "}{.storage}{")
+"}{end}'
+```
+
 ## 📂 Project Structure
 
 - **`part-1/`**: "Hello World" - Introduction to basic Admission Control.
@@ -64,6 +77,11 @@ helm install kueue oci://registry.k8s.io/kueue/charts/kueue
   - `local-queues.yaml`: Entry points for `team-a` and `team-b` namespaces.
   - `borrow-job.yaml`: A job for Team A that exceeds its nominal quota.
   - `team-b-job.yaml`: A job for Team B to test cohort-level queuing.
+- **`part-4/`**: "Preemption" - SLA management via PriorityClasses.
+  - `priority-classes.yaml`: Defines `low-priority` and `high-priority` workload classes.
+  - `infrastructure.yaml`: A ClusterQueue configured for preemption.
+  - `background-job.yaml`: A long-running, low-priority workload.
+  - `critical-job.yaml`: A high-priority job that triggers the eviction of background tasks.
 
 ## 🧠 Core Concepts (Part 1)
 
@@ -112,15 +130,20 @@ Part 3 demonstrates how Kueue solves the "stranded resources" problem using **Co
    - While Job 1 is running, submit **Job 2 (Team B)** for **300m CPU**.
    - **Result**: PENDING. Total cohort capacity is 1000m, but 800m is already in use. Team B must wait for Team A to finish and return the borrowed resources.
 
-## 🧪 Verification Commands
+## ⚡️ Priority & Preemption (Part 4)
 
-To verify the installation and API versions:
+Part 4 demonstrates how Kueue ensures SLAs for critical workloads through **PriorityClasses** and **Preemption**:
 
-```bash
-# Check Kueue pods
-kubectl get pods -n kueue-system
+- **WorkloadPriorityClass**: Defines a numeric priority for different types of jobs (e.g., 100 for Low, 1000 for High).
+- **Within-Queue Preemption**: When configured with `withinClusterQueue: LowerPriority`, Kueue will evict already-running lower-priority jobs to make room for a higher-priority one if the quota is full.
+- **Automatic Eviction**: Kueue handles the systematic termination of the evicted job's pods and returns it to the queue, ensuring the high-priority job can start immediately.
 
-# Verify CRD Storage Version (should be v1beta2)
-kubectl get crd clusterqueues.kueue.x-k8s.io -o jsonpath='{range .spec.versions[*]}{.name}{" (Storage: "}{.storage}{")
-"}{end}'
-```
+### Execution Plan
+1. **Priority Definitions**: Create `low-priority` and `high-priority` WorkloadPriorityClasses.
+2. **Preemption Policy**: Configure a `ClusterQueue` with a 1000m CPU quota and enable `withinClusterQueue` preemption.
+3. **The Fill-The-Pool Test**:
+   - Submit **Background Job** (Low Priority) for **800m CPU**.
+   - **Result**: Admitted and starts running immediately.
+4. **The Preemption Test**:
+   - Submit **Critical Job** (High Priority) for **400m CPU**.
+   - **Result**: Even though only 200m CPU is available, the Critical Job is admitted. Kueue **evicts** the Background Job, terminates its pods, and starts the Critical Job pods immediately.

@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: background-job-
+  labels:
+    kueue.x-k8s.io/queue-name: preemption-lq
+    kueue.x-k8s.io/priority-class: low-priority
+spec:
+  parallelism: 4
+  completions: 4
+  suspend: true
+  template:
+    spec:
+      containers:
+      - name: batch-job
+        image: gcr.io/k8s-staging-perf-tests/sleep:v0.1.0
+        args: ["5m"] # Runs for a long time to simulate "experimental" work
+        resources:
+          requests:
+            cpu: "200m" # Total: 4 * 200m = 800m
+            memory: "200Mi"
+      restartPolicy: Never
