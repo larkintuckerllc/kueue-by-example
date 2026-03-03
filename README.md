@@ -58,6 +58,12 @@ helm install kueue oci://registry.k8s.io/kueue/charts/kueue
   - `cluster-queue.yaml`: A prioritized queue that falls back to On-Demand if Spot is full.
   - `local-queue.yaml`: Connects to the smart queue.
   - `sample-job.yaml`: A job template for testing the fallback logic.
+- **`part-3/`**: "Borrowing" - Resource sharing via Cohorts.
+  - `resource-flavor.yaml`: A shared default resource flavor.
+  - `cluster-queues.yaml`: Two ClusterQueues in the same `cohortName`.
+  - `local-queues.yaml`: Entry points for `team-a` and `team-b` namespaces.
+  - `borrow-job.yaml`: A job for Team A that exceeds its nominal quota.
+  - `team-b-job.yaml`: A job for Team B to test cohort-level queuing.
 
 ## 🧠 Core Concepts (Part 1)
 
@@ -87,6 +93,24 @@ Part 2 explores **Smart Resource Selection** using multiple flavors and taints:
 4. **Fallback Test**:
    - Create **Job 1**: Fits in the 500m Spot quota. Kueue injects `spot` tolerations.
    - Create **Job 2**: Spot quota is now exhausted (only 100m left). Kueue automatically selects the `on-demand` flavor and injects the corresponding tolerations.
+
+## 🤝 Resource Sharing & Borrowing (Part 3)
+
+Part 3 demonstrates how Kueue solves the "stranded resources" problem using **Cohorts**:
+
+- **Cohorts (`cohortName`)**: A logical grouping of multiple `ClusterQueues`. Members of the same cohort can borrow unused resources from each other's nominal quotas.
+- **Borrowing**: If a team submits a job that exceeds their own quota, Kueue checks if other members of the cohort are using their quotas. If they are idle, the team can "borrow" from them.
+- **Cross-Namespace Queuing**: If the *entire* cohort's capacity is full, new jobs are queued globally, regardless of which namespace they were submitted to.
+
+### Execution Plan
+1. **Multi-Namespace Setup**: Separate `team-a` and `team-b` namespaces.
+2. **Shared Pool**: Create two `ClusterQueues` (each with 500m CPU) and join them into a cohort named `shared-pool`.
+3. **The Borrow Test**:
+   - Submit **Job 1 (Team A)** for **800m CPU**.
+   - **Result**: Admitted immediately. It uses its own 500m and **borrows 300m** from Team B's idle quota.
+4. **The Queuing Test**:
+   - While Job 1 is running, submit **Job 2 (Team B)** for **300m CPU**.
+   - **Result**: PENDING. Total cohort capacity is 1000m, but 800m is already in use. Team B must wait for Team A to finish and return the borrowed resources.
 
 ## 🧪 Verification Commands
 

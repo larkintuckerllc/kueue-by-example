@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: team-a-job-
+  namespace: team-a
+  labels:
+    kueue.x-k8s.io/queue-name: team-a-lq
+spec:
+  parallelism: 4
+  completions: 4
+  suspend: true
+  template:
+    spec:
+      containers:
+      - name: batch-job
+        image: gcr.io/k8s-staging-perf-tests/sleep:v0.1.0
+        args: ["60s"]
+        resources:
+          requests:
+            cpu: "200m" # Total: 4 * 200m = 800m (needs to borrow 300m)
+            memory: "100Mi"
+      restartPolicy: Never
